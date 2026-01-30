@@ -164,23 +164,53 @@ function openPopup(p) {
 
 popup.onclick = e => { if (e.target === popup) popup.classList.remove("active"); }
 
-function reserve(price, name) {
+async function reserve(price, name) {
   const place = document.getElementById("meetPlace").value.trim();
   const time = document.getElementById("meetTime").value;
+
   if (!place || !time) {
     tg.showAlert("Укажи место и время встречи!");
     return;
   }
+
   tg.HapticFeedback.impactOccurred("medium");
-  tg.sendData(JSON.stringify({
-    type: "reserve",
+
+  // Собираем данные
+  const payload = {
     product_name: name,
     price: price,
     meet_place: place,
-    meet_time: time
-  }));
-  popup.classList.remove("active");
-  // tg.showAlert("Бронь отправлена продавцу"); — Удалил, т.к. статус придёт от бота
+    meet_time: time,
+    buyer_id: tg.initDataUnsafe?.user?.id || 0,
+    username: tg.initDataUnsafe?.user?.username || tg.initDataUnsafe?.user?.first_name || 'аноним',
+    // init_data: tg.initData,   // ← раскомменти если хочешь валидировать на сервере (рекомендую)
+  };
+
+  popup.classList.remove("active");  // закрываем попап сразу, чтобы не висел
+
+  try {
+    const response = await fetch('https://vaip-4.onrender.com/api/reserve', {  // ← вставь свой реальный URL
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
+      body: JSON.stringify(payload)
+    });
+
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.error || `Ошибка ${response.status}`);
+    }
+
+    const data = await response.json();
+
+    tg.showAlert(`Бронь №${data.orderId} отправлена продавцу!\nОжидайте подтверждения.`);
+
+  } catch (err) {
+    console.error('Ошибка брони:', err);
+    tg.showAlert('Не удалось отправить бронь.\nПроверь интернет и попробуй снова.');
+  }
 }
 </script>
 </body>
